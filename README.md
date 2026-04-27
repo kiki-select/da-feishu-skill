@@ -83,15 +83,12 @@ bash scripts/funnydb post /api/v1/open/skillhub/tools/apps/list
 
 ```powershell
 # 1. 启用 WSL（管理员 PowerShell，未装过的话）
-wsl --install
+wsl --install --web-download
+# --web-download 直接从 GitHub 下载，绕过 Microsoft Store
 # 重启电脑后默认装 Ubuntu
 ```
 
-> ⚠️ **公司机器常见 403**：`wsl --install` 默认走 Microsoft Store 拉发行版，会被组策略 / 代理拦截。
-> **绕过方式**：从 GitHub 网页直接下载 MSIX 包安装：
-> - WSL 内核 + 用户态：<https://github.com/microsoft/WSL/releases>（下最新 `Microsoft.WSL_x.x.x.x_x64_ARM64.msixbundle`，双击装）
-> - Ubuntu 发行版：<https://aka.ms/wslubuntu2204>（下 `.appx` 双击装）
-> 装完 `wsl -l -v` 能列出 Ubuntu 即成功。
+> ⚠️ 不加 `--web-download` 默认走 Microsoft Store，公司机器常被组策略 / 代理拦截返回 403。加上这个 flag 就好了。
 
 ```powershell
 # 2. 进 WSL，准备依赖
@@ -276,7 +273,7 @@ da-feishu/
 | 中文 CSV 在飞书附表乱码 | 写 CSV 时必须加 UTF-8 BOM 头（`\xEF\xBB\xBF`） |
 | 内嵌 sheet 创建失败 | 查看 publish 日志，会自动回退到 lark-table；常见原因是 lark-cli 未授权 |
 | ECharts 图表只显示标题 | 确认 `render-charts.js` 用的是 SVG SSR 模式，不是 canvas |
-| `wsl --install` 报 403 / 卡 Store | Store 安装被公司策略拦截，改从 GitHub 网页下 MSIX 手动安装：[WSL releases](https://github.com/microsoft/WSL/releases) + [Ubuntu .appx](https://aka.ms/wslubuntu2204) |
+| `wsl --install` 报 403 / 卡 Store | 改用 `wsl --install --web-download` 从 GitHub 直接拉，绕过 Microsoft Store |
 | Windows 调 funnydb 报 `command not found` 或路径错乱 | 确认 `scripts/funnydb` 是 WSL shim 版本，且原始脚本叫 `funnydb-original` |
 | funnydb 调用 hang 住或授权失败 | 删除 skill 目录下 `.bin/` 让 CLI 重新下载二进制；如仍有问题按 funnydb skill 的提示重新走授权流程 |
 
