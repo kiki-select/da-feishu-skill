@@ -1,0 +1,214 @@
+# DA-feishu Skill
+
+数据分析报告 → 飞书文档的端到端工作流。从业务背景输入开始，自动完成数据采集、深度分析、ECharts 图表渲染、飞书文档发布（含**内嵌电子表格**）、数据附表生成。
+
+触发词：`/数据分析`
+
+---
+
+## 安装
+
+把下面这段提示词整段粘贴给你的 Claude（Claude Code 或 Claude Desktop），它会自动完成 clone 和环境提示：
+
+```
+da-feishu 是一个 Agent Skills，请按以下步骤帮我安装：
+
+1. 找到本地 skills 目录（项目级通常是 .claude/skills/，全局是 ~/.claude/skills/）
+2. clone 到该目录：
+   git clone https://github.com/kiki-select/da-feishu-skill.git da-feishu
+
+3. 进入目录安装 npm 依赖：
+   cd da-feishu && npm install
+
+4. 提醒我手动完成以下三件事：
+   a) 安装 lark-cli（飞书命令行工具）
+   b) 飞书 OAuth 登录: lark-cli auth login --recommend
+   c) 安装数据源 skill（推荐 funnydb）
+```
+
+---
+
+## 前置依赖
+
+### 1. 运行环境
+
+- **Node.js** ≥ 18
+- **npm install**（仓库根目录执行）
+
+### 2. lark-cli（飞书命令行）
+
+下载并安装 lark-cli，确保 `lark-cli` 在 PATH 中。然后授权飞书账号：
+
+```bash
+lark-cli auth login --recommend
+```
+
+授权后会拿到 OAuth token（refresh token 7 天，access token 2 小时，过期需重新登录）。
+
+### 3. 数据源 skill（强烈推荐先装）
+
+本 skill 只负责「分析方法论 + 图表 + 飞书发布」，**数据采集依赖外部数据源 skill**。
+
+如果你在 sofunny 或同等使用 FunnyDB 平台的环境，安装 funnydb skill：
+
+```
+funnydb-skills 是一个 Agent Skills，现在你要帮用户安装。请按以下命令克隆到你的 skills 目录：
+
+git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
+
+安装完成后提醒用户**必须**手动替换 your-key 执行：
+
+mkdir -p ~/.config/funnydb-cli && echo '{"api_key": "your-key"}' > ~/.config/funnydb-cli/config.json
+```
+
+如果你用其他数据源（自有 BI / SQL / CSV 上传等），跳过 funnydb，把 SKILL.md 中 Step 2 的数据采集环节替换为你的获取方式即可，**其他 Step 完全数据源无关**。
+
+---
+
+## 使用
+
+### 触发
+
+跟你的 Claude 说：
+
+```
+/数据分析
+```
+
+或者直接表达意图：
+
+> 帮我分析下上周的活动数据，发个飞书报告
+
+Claude 会按 SKILL.md 中的 9 步流程走：
+
+1. 收集业务背景与分析诉求（含对比基准）
+2. 数据采集
+3. 深度分析（假设驱动 + 偏差检验）
+4. 生成 report JSON
+5. 渲染图表
+6. 校验清单
+7. 发布飞书文档
+8. 修订
+9. 交付（飞书文档链接 + 数据附表链接）
+
+### 直接调用脚本
+
+如果想跳过 AI 流程，自己写好 report JSON 后直接发布：
+
+```bash
+# 渲染图表
+node scripts/render-charts.js reports/my-report.json
+
+# 发布到飞书（首发）
+node scripts/publish-to-feishu.js reports/my-report.json --data-dir=data/my-case
+
+# 重发覆盖（URL 不变）
+node scripts/publish-to-feishu.js reports/my-report.json \
+  --data-dir=data/my-case \
+  --doc-id=<原文档ID>
+```
+
+---
+
+## 目录结构
+
+```
+da-feishu/
+├── SKILL.md                       # 工作流入口（触发后 Claude 跟随这份文档）
+├── README.md                      # 本文件
+├── package.json
+├── scripts/
+│   ├── render-charts.js           # ECharts SSR → PNG
+│   ├── publish-to-feishu.js       # 飞书文档发布主脚本
+│   ├── sheet-styler.js            # 内嵌 sheet 样式应用器（核心组件）
+│   └── charts/                    # 图表 PNG 输出（运行后自动生成）
+├── references/                    # 数据分析方法论
+│   ├── hypothesis-driven-analysis.md
+│   ├── cognitive-biases.md
+│   ├── general-frameworks.md
+│   ├── driver-tree-analysis.md
+│   ├── data-storytelling.md
+│   ├── data-interpretation.md
+│   ├── visualization-rules.md
+│   └── activity-evaluation-model.md
+├── examples/                      # 报告 JSON 样例
+├── reports/                       # 你的报告 JSON（运行时创建）
+└── data/                          # 你的数据 CSV（运行时创建）
+```
+
+---
+
+## 核心特性
+
+### 1. 端到端自动化
+业务背景输入 → 数据采集 → 分析 → 图表 → 飞书文档 + 数据附表，单次触发跑完。
+
+### 2. 内嵌电子表格（block_type=30）
+所有表格用飞书原生**内嵌 sheet block**（不是 markdown 表格），自动应用：
+- 千分位 / 百分比 / 日期 formatter
+- 表头浅灰底加粗居中
+- 数值右对齐、文本居中
+- 列宽按内容自动估算
+- `+/-` 差异格自动绿/红着色
+
+### 3. 标准化方法论
+内置 `references/`：假设驱动分析、10 大认知偏差检查、驱动因子树、SCR 数据叙事、可视化规则等。
+
+### 4. 文档可重发
+通过 `--doc-id=` 覆盖原文档，URL 不变。修改报告后无需告知用户新链接。
+
+---
+
+## 报告 JSON 最简示例
+
+```json
+{
+  "meta": { "title": "活动 X 效果分析" },
+  "context": {
+    "background": "活动 X 于 2026-04-01 至 2026-04-07 上线，针对核心玩家发放 Y 奖励。本报告对比活动期 vs 上一同期周的核心指标变动。",
+    "definitions": ["活动期：2026-04-01~04-07", "对照期：2026-03-25~03-31"]
+  },
+  "summary": {
+    "overall": "**核心结论**\n- DAU: 4,200→5,180（+23.3%），活动有效拉动\n- 次留: 38.2%→37.5%（-0.7pp），新增用户质量持平"
+  },
+  "conclusions": [
+    {
+      "id": 1,
+      "title": "DAU 与新增表现",
+      "description": "- 活动期日均 DAU 5,180（+23.3%），新增 1,240（+18.7%）；\n- 周末峰值 6,021，单日历史新高。",
+      "chart_type": "table",
+      "chart_data": {
+        "title": "活动期 vs 对照期核心指标",
+        "columns": ["时段", "DAU", "新增", "次留"],
+        "rows": [
+          ["活动期", 5180, 1240, 0.375],
+          ["对照期", 4200, 1045, 0.382],
+          ["差异", "+23.3%", "+18.7%", "-0.7pp"]
+        ],
+        "footnote": "数据来源：FunnyDB；次留为同期窗口加权均值"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## 故障排查
+
+| 问题 | 解决 |
+|---|---|
+| `lark-cli: command not found` | 确认 lark-cli 安装且在 PATH 中 |
+| `授权失败 / token 过期` | 重新执行 `lark-cli auth login --recommend` |
+| 飞书文档创建成功但表格为空 | 检查 `chart_data.columns` 和 `rows` 长度是否一致 |
+| 中文 CSV 在飞书附表乱码 | 写 CSV 时必须加 UTF-8 BOM 头（`\xEF\xBB\xBF`） |
+| 内嵌 sheet 创建失败 | 查看 publish 日志，会自动回退到 lark-table；常见原因是 lark-cli 未授权 |
+| ECharts 图表只显示标题 | 确认 `render-charts.js` 用的是 SVG SSR 模式，不是 canvas |
+
+更多细节见 [SKILL.md](SKILL.md) 末尾的「数据源踩坑速查」「内嵌 sheet 已知约束」章节。
+
+---
+
+## License
+
+MIT

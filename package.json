@@ -1,0 +1,15 @@
+{
+  "name": "da-feishu-skill",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Data analysis report → Feishu document workflow (ECharts SSR + embedded sheet blocks)",
+  "type": "commonjs",
+  "scripts": {
+    "render": "node scripts/render-charts.js",
+    "publish": "node scripts/publish-to-feishu.js"
+  },
+  "dependencies": {
+    "echarts": "^5.6.0",
+    "sharp": "^0.33.0"
+  }
+}

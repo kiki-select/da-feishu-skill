@@ -1,0 +1,12 @@
+node_modules/
+scripts/charts/
+scripts/_tmp_*
+reports/_publish_history.json
+reports/*.json
+data/
+*.log
+.DS_Store
+Thumbs.db
+
+# 例外：保留 examples/ 目录下的示例 JSON
+!examples/*.json
