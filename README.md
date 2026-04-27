@@ -51,23 +51,15 @@ lark-cli auth login --recommend
 
 #### 3.1 macOS / Linux 安装 funnydb
 
-把这段提示词整段交给 Claude，它会帮你 clone + 提示填 key：
+把这段提示词整段交给 Claude：
 
 ```
 funnydb-skills 是一个 Agent Skills，现在你要帮用户安装。请按以下命令克隆到你的 skills 目录：
 
 git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
-
-安装完成后提醒用户**必须**手动替换 your-key 执行：
-
-mkdir -p ~/.config/funnydb-cli && echo '{"api_key": "your-key"}' > ~/.config/funnydb-cli/config.json
 ```
 
-API Key 找你们 FunnyDB 数据平台管理员要。配置文件位置 `~/.config/funnydb-cli/config.json`，结构：
-
-```json
-{ "api_key": "fdb_xxxxxxxxxxxxxxxxxxxx" }
-```
+新版 funnydb 已支持自动授权验证，**不需要手动配置 API Key**。
 
 装好后验证：
 
@@ -101,10 +93,9 @@ sudo apt update && sudo apt install -y curl unzip
 # 3. （回到 Git Bash）clone funnydb skill 到你的 skills 目录
 cd <skills目录>
 git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
-
-# 4. 在 WSL 里写 API Key（注意是写到 WSL 的 home，不是 Windows 的）
-wsl -- bash -c 'mkdir -p ~/.config/funnydb-cli && echo "{\"api_key\":\"your-key\"}" > ~/.config/funnydb-cli/config.json'
 ```
+
+新版 funnydb 自动授权，**不需要手动写 API Key**。
 
 **Windows shim 脚本**（如果你 clone 的版本里没有，把下面这段保存为 `scripts/funnydb` 替换原 `scripts/funnydb`）：
 
@@ -277,8 +268,8 @@ da-feishu/
 | 中文 CSV 在飞书附表乱码 | 写 CSV 时必须加 UTF-8 BOM 头（`\xEF\xBB\xBF`） |
 | 内嵌 sheet 创建失败 | 查看 publish 日志，会自动回退到 lark-table；常见原因是 lark-cli 未授权 |
 | ECharts 图表只显示标题 | 确认 `render-charts.js` 用的是 SVG SSR 模式，不是 canvas |
-| Windows 调 funnydb 报 `command not found` 或路径错乱 | 确认 `scripts/funnydb` 是 WSL shim 版本，且原始脚本叫 `funnydb-original`；config 写在 WSL home 不是 Windows home |
-| funnydb 调用 hang 住 | 进 WSL 跑 `~/.config/funnydb-cli/` 看 key 是否在；删除 skill 目录下 `.bin/` 让 CLI 重新下载二进制 |
+| Windows 调 funnydb 报 `command not found` 或路径错乱 | 确认 `scripts/funnydb` 是 WSL shim 版本，且原始脚本叫 `funnydb-original` |
+| funnydb 调用 hang 住或授权失败 | 删除 skill 目录下 `.bin/` 让 CLI 重新下载二进制；如仍有问题按 funnydb skill 的提示重新走授权流程 |
 
 更多细节见 [SKILL.md](SKILL.md) 末尾的「数据源踩坑速查」「内嵌 sheet 已知约束」章节。
 
