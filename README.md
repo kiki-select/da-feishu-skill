@@ -34,6 +34,19 @@ da-feishu 是一个 Agent Skills，请按以下步骤依次帮我安装，每步
 7. 全部完成后输出确认，并简单提示我下一步可以用 `/数据分析` 触发工作流。
 ```
 
+### 非 Claude Code 用户（Codex / OpenCode / Aider / π 等）
+
+Agent Skills 的 `name:` frontmatter + `/<skill>` 触发语法是 Claude 生态特有的，其他 Agent 工具**不识别 skills 目录**，但本仓库可以无缝降级使用：
+
+1. **安装位置随意**：`git clone` 到任何目录都行（不需要 `.claude/skills/`），然后 `npm install`。
+2. **让 Agent 读 SKILL.md**：把 `SKILL.md` 当作本项目的工作流说明书。常见做法：
+   - Codex / OpenCode：项目根放一份 `AGENTS.md` 软链到 `SKILL.md`（`ln -s SKILL.md AGENTS.md`），它们会自动加载。
+   - 其他工具：让 Agent 第一步 `cat SKILL.md` 读一遍，或手动贴进 system prompt。
+3. **触发方式改成自然语言**：不能用 `/数据分析`，直接说「按 SKILL.md 的 9 步流程跑一份数据分析报告」即可。
+4. **脚本与 Agent 框架无关**：`render-charts.js` / `publish-to-feishu.js` 是纯 Node 脚本，任何工具甚至不带 Agent 都能直接 `node scripts/xxx.js report.json` 跑。
+
+依赖（lark-cli、funnydb）的安装步骤完全一致，与 Agent 工具无关。
+
 ---
 
 ## 前置依赖
