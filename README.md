@@ -8,22 +8,30 @@
 
 ## 安装
 
-把下面这段提示词整段粘贴给你的 Claude（Claude Code 或 Claude Desktop），它会自动完成 clone 和环境提示：
+把下面这段提示词整段粘贴给你的 Claude（Claude Code 或 Claude Desktop），它会按顺序跑完所有步骤：
 
 ```
-da-feishu 是一个 Agent Skills，请按以下步骤帮我安装：
+da-feishu 是一个 Agent Skills，请按以下步骤依次帮我安装，每步执行完再进下一步，遇到错误立即停下并告知我：
 
 1. 找到本地 skills 目录（项目级通常是 .claude/skills/，全局是 ~/.claude/skills/）
-2. clone 到该目录：
+
+2. clone 仓库：
    git clone https://github.com/kiki-select/da-feishu-skill.git da-feishu
 
 3. 进入目录安装 npm 依赖：
    cd da-feishu && npm install
 
-4. 提醒我手动完成以下三件事：
-   a) 安装 lark-cli（飞书命令行工具）
-   b) 飞书 OAuth 登录: lark-cli auth login --recommend
-   c) 安装数据源 skill（推荐 funnydb）
+4. 安装 lark-cli（飞书命令行工具），确保 `lark-cli` 在 PATH 中可用，验证：
+   lark-cli --version
+
+5. 启动飞书 OAuth 授权（会弹浏览器，让我登录）：
+   lark-cli auth login --recommend
+
+6. 安装数据源 skill funnydb（在同一个 skills 目录下）：
+   git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
+   注：Windows 用户如果没装 WSL，先跑 `wsl --install --web-download`，重启后再继续这一步。新版 funnydb 自动授权，无需手动配置 API Key。
+
+7. 全部完成后输出确认，并简单提示我下一步可以用 `/数据分析` 触发工作流。
 ```
 
 ---
