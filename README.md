@@ -49,7 +49,9 @@ lark-cli auth login --recommend
 
 本 skill 只负责「分析方法论 + 图表 + 飞书发布」，**数据采集依赖外部数据源 skill**。
 
-如果你在 sofunny 或同等使用 FunnyDB 平台的环境，安装 funnydb skill：
+#### 3.1 macOS / Linux 安装 funnydb
+
+把这段提示词整段交给 Claude，它会帮你 clone + 提示填 key：
 
 ```
 funnydb-skills 是一个 Agent Skills，现在你要帮用户安装。请按以下命令克隆到你的 skills 目录：
@@ -61,7 +63,78 @@ git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
 mkdir -p ~/.config/funnydb-cli && echo '{"api_key": "your-key"}' > ~/.config/funnydb-cli/config.json
 ```
 
-如果你用其他数据源（自有 BI / SQL / CSV 上传等），跳过 funnydb，把 SKILL.md 中 Step 2 的数据采集环节替换为你的获取方式即可，**其他 Step 完全数据源无关**。
+API Key 找你们 FunnyDB 数据平台管理员要。配置文件位置 `~/.config/funnydb-cli/config.json`，结构：
+
+```json
+{ "api_key": "fdb_xxxxxxxxxxxxxxxxxxxx" }
+```
+
+装好后验证：
+
+```bash
+cd <skills目录>/funnydb
+bash scripts/funnydb post /api/v1/open/skillhub/tools/apps/list
+# 能列出你有权限的 app 列表即成功
+```
+
+#### 3.2 Windows 用户：通过 WSL 桥接（重要）
+
+**funnydb-cli 二进制只发 Linux/macOS 版本，Windows 必须通过 WSL 跑**。本仓库附带的 `scripts/funnydb` 是 Windows 侧的 shim，自动把调用转发进 WSL。原理：
+
+1. 把 Git Bash 路径 `/d/...` 加 `/mnt` 前缀转成 WSL 路径 `/mnt/d/...`
+2. `MSYS_NO_PATHCONV=1` 阻止 Git Bash 把 WSL 路径再次转换
+3. `sed 's/\r$//'` 去 Windows CRLF
+4. WSL 内 `bash` 执行 `funnydb-original` 原生脚本
+5. `FUNNYDB_CLI_BIN_DIR` 指向 skill 目录下的 `.bin/`，二进制按需下载
+
+**安装步骤：**
+
+```powershell
+# 1. 启用 WSL（管理员 PowerShell，未装过的话）
+wsl --install
+# 重启电脑后默认装 Ubuntu
+
+# 2. 进 WSL，准备依赖
+wsl
+sudo apt update && sudo apt install -y curl unzip
+
+# 3. （回到 Git Bash）clone funnydb skill 到你的 skills 目录
+cd <skills目录>
+git clone https://git.sofunny.io/data-analysis/funnydb-skills.git funnydb
+
+# 4. 在 WSL 里写 API Key（注意是写到 WSL 的 home，不是 Windows 的）
+wsl -- bash -c 'mkdir -p ~/.config/funnydb-cli && echo "{\"api_key\":\"your-key\"}" > ~/.config/funnydb-cli/config.json'
+```
+
+**Windows shim 脚本**（如果你 clone 的版本里没有，把下面这段保存为 `scripts/funnydb` 替换原 `scripts/funnydb`）：
+
+```bash
+#!/usr/bin/env bash
+# Windows → WSL shim for funnydb-cli
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WSL_SCRIPTS_DIR="/mnt${SCRIPT_DIR}"
+WSL_SKILL_DIR="$(dirname "$WSL_SCRIPTS_DIR")"
+
+QUOTED_ARGS=""
+for arg in "$@"; do
+  escaped="${arg//\'/\'\\\'\'}"
+  QUOTED_ARGS="$QUOTED_ARGS '${escaped}'"
+done
+
+export MSYS_NO_PATHCONV=1
+wsl -- bash -c "export FUNNYDB_CLI_BIN_DIR='${WSL_SKILL_DIR}/.bin'; sed 's/\r\$//' '${WSL_SCRIPTS_DIR}/funnydb-original' > /tmp/funnydb-run.sh && bash /tmp/funnydb-run.sh${QUOTED_ARGS}"
+```
+
+把原仓库的 `scripts/funnydb` 重命名为 `scripts/funnydb-original`，再放上面这段 shim。验证：
+
+```bash
+cd <skills目录>/funnydb
+bash scripts/funnydb post /api/v1/open/skillhub/tools/apps/list
+```
+
+#### 3.3 其他数据源
+
+如果你用自有 BI / SQL / CSV 上传等，跳过 funnydb，把 SKILL.md 中 Step 2 的数据采集环节替换为你的获取方式即可，**其他 Step 完全数据源无关**。
 
 ---
 
@@ -204,6 +277,8 @@ da-feishu/
 | 中文 CSV 在飞书附表乱码 | 写 CSV 时必须加 UTF-8 BOM 头（`\xEF\xBB\xBF`） |
 | 内嵌 sheet 创建失败 | 查看 publish 日志，会自动回退到 lark-table；常见原因是 lark-cli 未授权 |
 | ECharts 图表只显示标题 | 确认 `render-charts.js` 用的是 SVG SSR 模式，不是 canvas |
+| Windows 调 funnydb 报 `command not found` 或路径错乱 | 确认 `scripts/funnydb` 是 WSL shim 版本，且原始脚本叫 `funnydb-original`；config 写在 WSL home 不是 Windows home |
+| funnydb 调用 hang 住 | 进 WSL 跑 `~/.config/funnydb-cli/` 看 key 是否在；删除 skill 目录下 `.bin/` 让 CLI 重新下载二进制 |
 
 更多细节见 [SKILL.md](SKILL.md) 末尾的「数据源踩坑速查」「内嵌 sheet 已知约束」章节。
 
