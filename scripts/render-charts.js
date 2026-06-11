@@ -24,17 +24,29 @@ function needsRotation(labels) {
 function buildLineOption(data) {
   const seriesKeys = Object.keys(data.series || {});
   const rotate = needsRotation(data.x_labels) ? 30 : 0;
+  const dualAxis = !!(data.yAxisLeft || data.yAxisRight);
+  // 单系列时图例与标题语义重复（如「DAU」），自动隐藏
+  const showLegend = seriesKeys.length > 1;
+  const hasTitle = !!(data.title && String(data.title).trim());
+  // 动态 grid.top：title + legend 都没就贴边
+  const gridTop = hasTitle && showLegend ? 75 : hasTitle ? 50 : showLegend ? 40 : 15;
   return {
     title: { text: data.title || '', left: 'center', textStyle: { fontSize: 16, color: '#3d3630' } },
     tooltip: { trigger: 'axis' },
-    legend: { data: seriesKeys, top: 35, textStyle: { fontSize: 12 } },
-    grid: { top: 75, bottom: rotate ? 60 : 35, left: 65, right: 30 },
+    legend: showLegend ? { data: seriesKeys, top: 35, textStyle: { fontSize: 12 } } : { show: false },
+    grid: { top: gridTop, bottom: rotate ? 60 : 35, left: 65, right: dualAxis ? 65 : 30 },
     xAxis: { type: 'category', data: data.x_labels || [], axisLabel: { fontSize: 10, rotate } },
-    yAxis: { type: 'value', name: data.yAxisName || '' },
+    yAxis: dualAxis
+      ? [
+          { type: 'value', name: data.yAxisLeft || '', position: 'left' },
+          { type: 'value', name: data.yAxisRight || '', position: 'right', splitLine: { show: false } },
+        ]
+      : { type: 'value', name: data.yAxisName || '' },
     series: seriesKeys.map((key, i) => ({
       name: key,
       type: 'line',
       data: data.series[key],
+      yAxisIndex: dualAxis ? (i === 0 ? 0 : 1) : 0,
       smooth: true,
       symbol: 'circle',
       symbolSize: 6,
@@ -149,6 +161,32 @@ function buildScatterOption(data) {
 }
 
 function buildOption(type, data) {
+  // 预处理：column_types 中的 percent / percent0 列，把 0~1 小数转为 0~100 用于画图
+  // 同时给 series 名加 "(%)" 后缀，明示 Y 轴/图例单位（visualization-rules: 轴标签必须标注单位）
+  if (data && data.column_types) {
+    const types = data.column_types;
+    const scale = v => (v == null ? null : v * 100);
+    const transform = (series) => {
+      if (!series) return series;
+      const keys = Object.keys(series);
+      const newS = {};
+      keys.forEach((k, i) => {
+        const t = types[i + 1]; // index 0 是 x_labels 列
+        if (t === 'percent' || t === 'percent0') {
+          // 重命名加 (%) 后缀；如果用户已经加了就不重复
+          const newKey = k.endsWith('(%)') ? k : `${k}(%)`;
+          newS[newKey] = series[k].map(scale);
+        } else {
+          newS[k] = series[k];
+        }
+      });
+      return newS;
+    };
+    data = { ...data };
+    if (data.series) data.series = transform(data.series);
+    if (data.bar_series) data.bar_series = transform(data.bar_series);
+    if (data.line_series) data.line_series = transform(data.line_series);
+  }
   switch (type) {
     case 'line': return buildLineOption(data);
     case 'bar': return buildBarOption(data);
@@ -165,6 +203,50 @@ async function renderToPNG(option, outPath) {
   const svg = chart.renderToSVGString();
   chart.dispose();
   await sharp(Buffer.from(svg)).png().toFile(outPath);
+}
+
+async function verifyHighConclusionCharts(report, chartsDir) {
+  const failures = [];
+  const conclusions = report.conclusions || [];
+
+  for (const c of conclusions) {
+    if (c.importance !== 'high') continue;
+
+    const expected = [];
+    if (c.chart_type && c.chart_type !== 'table' && c.chart_data) {
+      expected.push(`conclusion_${c.id}_main.png`);
+    }
+    if (Array.isArray(c.charts)) {
+      c.charts.forEach((ch, i) => {
+        if (ch.type && ch.type !== 'table') expected.push(`conclusion_${c.id}_${i}.png`);
+      });
+    }
+
+    for (const filename of expected) {
+      const filePath = path.join(chartsDir, filename);
+      if (!fs.existsSync(filePath)) {
+        failures.push(`结论 ${c.id} (${c.title}) 缺少 high 图表 ${filename}`);
+        continue;
+      }
+      const stat = fs.statSync(filePath);
+      if (stat.size < 1024) {
+        failures.push(`结论 ${c.id} (${c.title}) 图表 ${filename} 文件过小 (${stat.size} bytes)`);
+        continue;
+      }
+      const meta = await sharp(filePath).metadata();
+      if (!meta.width || !meta.height) {
+        failures.push(`结论 ${c.id} (${c.title}) 图表 ${filename} 无有效尺寸`);
+      }
+    }
+  }
+
+  if (failures.length) {
+    console.error('\nhigh 重要结论图核查失败：');
+    failures.forEach(f => console.error(`- ${f}`));
+    process.exit(1);
+  }
+
+  console.log('high 重要结论图核查通过');
 }
 
 async function main() {
@@ -219,6 +301,7 @@ async function main() {
   }
 
   console.log(`\n共生成 ${count} 张图表 → ${chartsDir}`);
+  await verifyHighConclusionCharts(report, chartsDir);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
